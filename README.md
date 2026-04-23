@@ -39,6 +39,13 @@ Projekt planowany jest w oparciu o architekturę mikroserwisową oraz konteneryz
 - results-service – agregacja wyników
 - worker – przetwarzanie zdarzeń asynchronicznych
 
+### Frontend i warstwa API
+- Next.js – aplikacja frontendowa
+- Next.js Route Handlers – API Gateway
+
+### Backend (mikroserwisy)
+- Express.js – implementacja mikroserwisów REST API
+
 ### CI/CD
 - Jenkins – automatyzacja buildów i wdrożeń
 
