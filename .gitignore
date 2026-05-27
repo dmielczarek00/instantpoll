@@ -1,0 +1,71 @@
+
+# DEPENDENCIES (wszędzie)
+
+node_modules
+**/node_modules
+
+
+# LOGS
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
+# ENV FILES
+
+.env
+.env.*.local
+.env.local
+.env.development
+.env.production
+.env.test
+
+# zostaw template!
+!.env.template
+!.env.example
+
+
+# NEXT.JS (frontend)
+
+**/.next
+**/out
+**/build
+.next
+out
+build
+
+
+# TYPESCRIPT
+
+*.tsbuildinfo
+next-env.d.ts
+
+
+# DATABASE / BACKUPS
+
+*.sqlite
+*.db
+
+
+# OS
+
+.DS_Store
+Thumbs.db
+
+
+# DOCKER (opcjonalnie)
+
+docker-compose.override.yml
+
+
+# IDE
+
+.vscode/
+.idea/
+
+
+# TESTS / COVERAGE
+
+coverage/
