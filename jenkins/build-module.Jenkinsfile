@@ -110,19 +110,19 @@ pipeline {
                     redis:7-alpine
 
                     echo "Waiting for PostgreSQL..."
-                    for i in $(seq 1 30); do
+                    for i in $(seq 1 3); do
                         if docker exec "${POSTGRES_CONTAINER}" pg_isready -U instantpoll -d instantpoll >/dev/null 2>&1; then
                             echo "PostgreSQL is ready"
                             break
                         fi
 
-                        if [ "$i" -eq 30 ]; then
+                        if [ "$i" -eq 3 ]; then
                             echo "PostgreSQL did not become ready"
                             docker logs "${POSTGRES_CONTAINER}" || true
                             exit 1
                         fi
 
-                        sleep 1
+                        sleep 10
                     done
 
                     docker run -d \
@@ -135,7 +135,7 @@ pipeline {
                     "${IMAGE_NAME}"
 
                     echo "Waiting for ${MODULE_NAME} health..."
-                    for i in $(seq 1 30); do
+                    for i in $(seq 1 3); do
                         if docker run --rm \
                             --network "${TEST_NETWORK}" \
                             curlimages/curl:8.10.1 \
@@ -152,7 +152,7 @@ pipeline {
                             exit 1
                         fi
 
-                        sleep 1
+                        sleep 10
                     done
 
                     echo "${MODULE_NAME} healthcheck timeout"
