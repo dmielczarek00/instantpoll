@@ -25,7 +25,7 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+COPY --from=deps /app/node_modules ./node_modules
 
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/public ./public
