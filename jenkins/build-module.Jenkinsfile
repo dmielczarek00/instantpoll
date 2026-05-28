@@ -150,7 +150,7 @@ pipeline {
             }
         }
 
-        stage('Smoke test image') {
+        stage('Smoke test frontend image') {
             when {
                 expression {
                     return env.MODULE_NAME == 'frontend'
