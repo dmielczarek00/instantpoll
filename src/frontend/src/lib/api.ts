@@ -7,16 +7,26 @@ import type {
   UpdatePollSettingsRequest,
 } from "@/types/api";
 
+function apiUrl(path: string): string {
+  if (typeof window !== "undefined") {
+    return path;
+  }
+
+  const baseUrl = process.env.INTERNAL_FRONTEND_URL ?? "http://localhost:3000";
+  return `${baseUrl}${path}`;
+}
+
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: "Błąd sieci" }));
     throw new Error(error.message ?? `HTTP ${res.status}`);
   }
+
   return res.json() as Promise<T>;
 }
 
 export async function createPoll(data: CreatePollRequest): Promise<CreatePollResponse> {
-  const res = await fetch(`/api/polls`, {
+  const res = await fetch(apiUrl(`/api/polls`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -26,12 +36,15 @@ export async function createPoll(data: CreatePollRequest): Promise<CreatePollRes
 }
 
 export async function fetchPoll(publicId: string): Promise<Poll> {
-  const res = await fetch(`/api/polls/${publicId}`);
+  const res = await fetch(apiUrl(`/api/polls/${publicId}`), {
+    cache: "no-store",
+  });
+
   return handleResponse<Poll>(res);
 }
 
 export async function castVote(data: CastVoteRequest): Promise<{ success: boolean }> {
-  const res = await fetch(`/api/votes`, {
+  const res = await fetch(apiUrl(`/api/votes`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -41,12 +54,18 @@ export async function castVote(data: CastVoteRequest): Promise<{ success: boolea
 }
 
 export async function fetchResults(publicId: string): Promise<PollResults> {
-  const res = await fetch(`/api/results/${publicId}`);
+  const res = await fetch(apiUrl(`/api/results/${publicId}`), {
+    cache: "no-store",
+  });
+
   return handleResponse<PollResults>(res);
 }
 
 export async function fetchAdminData(adminId: string): Promise<AdminPollData> {
-  const res = await fetch(`/api/admin/${adminId}`);
+  const res = await fetch(apiUrl(`/api/admin/${adminId}`), {
+    cache: "no-store",
+  });
+
   return handleResponse<AdminPollData>(res);
 }
 
@@ -54,7 +73,7 @@ export async function updatePollSettings(
   adminId: string,
   data: UpdatePollSettingsRequest
 ): Promise<AdminPollData> {
-  const res = await fetch(`/api/admin/${adminId}`, {
+  const res = await fetch(apiUrl(`/api/admin/${adminId}`), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -64,7 +83,7 @@ export async function updatePollSettings(
 }
 
 export async function deletePoll(adminId: string): Promise<void> {
-  const res = await fetch(`/api/admin/${adminId}`, {
+  const res = await fetch(apiUrl(`/api/admin/${adminId}`), {
     method: "DELETE",
   });
 
@@ -72,7 +91,7 @@ export async function deletePoll(adminId: string): Promise<void> {
 }
 
 export async function resetVotes(adminId: string): Promise<AdminPollData> {
-  const res = await fetch(`/api/admin/${adminId}/reset`, {
+  const res = await fetch(apiUrl(`/api/admin/${adminId}/reset`), {
     method: "POST",
   });
 

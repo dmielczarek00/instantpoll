@@ -3,23 +3,37 @@ import type { CreatePollRequest, CreatePollResponse } from "@/types/api";
 
 const POLL_SERVICE_URL = process.env.POLL_SERVICE_URL;
 
+function getAppUrl(req: NextRequest): string {
+  const host =
+    req.headers.get("x-forwarded-host") ??
+    req.headers.get("host") ??
+    "localhost:3000";
+
+  const proto =
+    req.headers.get("x-forwarded-proto") ??
+    "http";
+
+  return `${proto}://${host}`;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body: CreatePollRequest = await req.json();
 
-    // Walidacja podstawowa
     if (!body.title?.trim()) {
       return NextResponse.json(
         { message: "Tytuł ankiety jest wymagany" },
         { status: 400 }
       );
     }
+
     if (!body.questions?.length) {
       return NextResponse.json(
         { message: "Ankieta musi mieć co najmniej jedno pytanie" },
         { status: 400 }
       );
     }
+
     for (const q of body.questions) {
       if (!q.text?.trim()) {
         return NextResponse.json(
@@ -27,6 +41,7 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+
       if (q.options.length < 2) {
         return NextResponse.json(
           { message: "Każde pytanie musi mieć co najmniej 2 opcje" },
@@ -35,18 +50,38 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (POLL_SERVICE_URL) {
-      const res = await fetch(`${POLL_SERVICE_URL}/polls`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
+    if (!POLL_SERVICE_URL) {
+      return NextResponse.json(
+        { message: "POLL_SERVICE_URL nie jest skonfigurowany" },
+        { status: 500 }
+      );
+    }
+
+    const res = await fetch(`${POLL_SERVICE_URL}/polls`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json() as CreatePollResponse;
+
+    if (!res.ok) {
       return NextResponse.json(data, { status: res.status });
     }
 
+    const appUrl = getAppUrl(req);
+
+    return NextResponse.json(
+      {
+        ...data,
+        publicUrl: `${appUrl}/poll/${data.poll.publicId}`,
+        adminUrl: `${appUrl}/admin/${data.poll.adminId}`,
+      },
+      { status: res.status }
+    );
   } catch (err) {
     console.error("[POST /api/polls]", err);
+
     return NextResponse.json(
       { message: "Wystąpił błąd serwera" },
       { status: 500 }
