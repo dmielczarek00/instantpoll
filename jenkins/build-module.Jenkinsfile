@@ -52,6 +52,20 @@ pipeline {
             }
         }
 
+        stage('Trivy filesystem scan') {
+            steps {
+                sh '''
+                    trivy fs \
+                    --scanners vuln,misconfig,secret \
+                    --severity HIGH,CRITICAL \
+                    --ignore-unfixed \
+                    --exit-code 1 \
+                    --no-progress \
+                    "${MODULE_PATH}"
+                '''
+            }
+        }
+
         stage('Build image') {
             steps {
                 sh '''
