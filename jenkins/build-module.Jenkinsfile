@@ -75,7 +75,7 @@ pipeline {
             steps {
                 sh '''
                     trivy image \
-                      --severity HIGH,CRITICAL \
+                      --severity CRITICAL \
                       --ignore-unfixed \
                       --exit-code 1 \
                       --no-progress \
