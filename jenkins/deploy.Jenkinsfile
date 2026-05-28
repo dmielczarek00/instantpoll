@@ -1,23 +1,6 @@
 pipeline {
     agent any
 
-    parameters {
-        booleanParam(name: 'DEPLOY_FRONTEND', defaultValue: false, description: 'Wdrożyć frontend?')
-        string(name: 'FRONTEND_TAG', defaultValue: '', description: 'Tag obrazu frontend, np. b12-a1b2c3d')
-
-        booleanParam(name: 'DEPLOY_POLL_SERVICE', defaultValue: false, description: 'Wdrożyć poll-service?')
-        string(name: 'POLL_SERVICE_TAG', defaultValue: '', description: 'Tag obrazu poll-service')
-
-        booleanParam(name: 'DEPLOY_VOTE_SERVICE', defaultValue: false, description: 'Wdrożyć vote-service?')
-        string(name: 'VOTE_SERVICE_TAG', defaultValue: '', description: 'Tag obrazu vote-service')
-
-        booleanParam(name: 'DEPLOY_RESULTS_SERVICE', defaultValue: false, description: 'Wdrożyć results-service?')
-        string(name: 'RESULTS_SERVICE_TAG', defaultValue: '', description: 'Tag obrazu results-service')
-
-        booleanParam(name: 'DEPLOY_WORKER', defaultValue: false, description: 'Wdrożyć worker?')
-        string(name: 'WORKER_TAG', defaultValue: '', description: 'Tag obrazu worker')
-    }
-
     environment {
         APP_SERVER = '192.168.1.108'
         APP_DIR = '/opt/instantpoll'
@@ -119,30 +102,31 @@ EOF
             steps {
                 sshagent(credentials: ['app-server-ssh']) {
                     sh '''
-                        ssh -o StrictHostKeyChecking=no sysadmin@${APP_SERVER} "
+                        ssh -o StrictHostKeyChecking=no sysadmin@${APP_SERVER} '
                             set -e
-                            cd ${APP_DIR}
+                            cd /opt/instantpoll
 
                             test -f .env
+                            test -f .env.deploy-updates
 
                             while IFS='=' read -r KEY VALUE; do
-                                [ -z \\"\\$KEY\\" ] && continue
+                                [ -z "$KEY" ] && continue
 
-                                if grep -q \\"^\\${KEY}=\\" .env; then
-                                    sed -i \\"s|^\\${KEY}=.*|\\${KEY}=\\${VALUE}|\\" .env
+                                if grep -q "^${KEY}=" .env; then
+                                    sed -i "s|^${KEY}=.*|${KEY}=${VALUE}|" .env
                                 else
-                                    echo \\"\\${KEY}=\\${VALUE}\\" >> .env
+                                    echo "${KEY}=${VALUE}" >> .env
                                 fi
                             done < .env.deploy-updates
 
                             rm -f .env.deploy-updates
 
-                            echo 'Selected services: ${SELECTED_SERVICES}'
+                            echo "Selected services: ${SELECTED_SERVICES}"
 
                             docker compose pull ${SELECTED_SERVICES}
                             docker compose up -d ${SELECTED_SERVICES}
                             docker compose ps
-                        "
+                        '
                     '''
                 }
             }
