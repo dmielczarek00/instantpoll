@@ -4,9 +4,9 @@ services:
     container_name: instantpoll-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: instantpoll
-      POSTGRES_USER: instantpoll
-      POSTGRES_PASSWORD: instantpoll_dev_password
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -45,7 +45,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      DATABASE_URL: postgresql://instantpoll:instantpoll_dev_password@postgres:5432/instantpoll
+      DATABASE_URL: ${DATABASE_URL}
     depends_on:
       - postgres
     networks:
@@ -58,8 +58,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3002
-      DATABASE_URL: postgresql://instantpoll:instantpoll_dev_password@postgres:5432/instantpoll
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
     depends_on:
       - postgres
       - redis
@@ -73,7 +73,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3003
-      DATABASE_URL: postgresql://instantpoll:instantpoll_dev_password@postgres:5432/instantpoll
+      DATABASE_URL: ${DATABASE_URL}
     depends_on:
       - postgres
     networks:
@@ -85,8 +85,8 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://instantpoll:instantpoll_dev_password@postgres:5432/instantpoll
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
     depends_on:
       - postgres
       - redis
