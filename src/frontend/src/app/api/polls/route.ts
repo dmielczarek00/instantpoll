@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import type { CreatePollRequest, CreatePollResponse } from "@/types/api";
 
 const POLL_SERVICE_URL = process.env.POLL_SERVICE_URL;
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-
 
 export async function POST(req: NextRequest) {
   try {
