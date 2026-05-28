@@ -302,6 +302,167 @@ liquibase/liquibase:4.26.0-alpine
 
 Schemat bazy zarządzany jest przez Liquibase.
 
+## Tabele
+
+### polls
+
+Przechowuje podstawowe informacje o ankietach.
+
+| Kolumna         | Typ         | Opis                                  |
+| --------------- | ----------- | ------------------------------------- |
+| id              | UUID        | wewnętrzny identyfikator              |
+| public_id       | VARCHAR(12) | publiczny identyfikator ankiety       |
+| admin_id        | VARCHAR(32) | prywatny identyfikator administratora |
+| title           | TEXT        | tytuł ankiety                         |
+| is_active       | BOOLEAN     | status aktywności ankiety             |
+| results_visible | BOOLEAN     | widoczność wyników                    |
+| created_at      | TIMESTAMPTZ | data utworzenia                       |
+| updated_at      | TIMESTAMPTZ | data aktualizacji                     |
+
+---
+
+### questions
+
+Pytania przypisane do ankiety.
+
+| Kolumna  | Typ         | Opis                  |
+| -------- | ----------- | --------------------- |
+| id       | UUID        | identyfikator pytania |
+| poll_id  | UUID        | powiązana ankieta     |
+| text     | TEXT        | treść pytania         |
+| type     | VARCHAR(10) | single lub multiple   |
+| position | SMALLINT    | kolejność pytań       |
+
+---
+
+### options
+
+Możliwe odpowiedzi dla pytania.
+
+| Kolumna     | Typ      | Opis                 |
+| ----------- | -------- | -------------------- |
+| id          | UUID     | identyfikator opcji  |
+| question_id | UUID     | pytanie              |
+| text        | TEXT     | treść odpowiedzi     |
+| position    | SMALLINT | kolejność odpowiedzi |
+
+---
+
+### votes
+
+Oddane głosy użytkowników.
+
+| Kolumna     | Typ         | Opis                       |
+| ----------- | ----------- | -------------------------- |
+| id          | UUID        | identyfikator głosu        |
+| poll_id     | UUID        | ankieta                    |
+| fingerprint | VARCHAR(64) | identyfikator przeglądarki |
+| ip_hash     | VARCHAR(64) | opcjonalny hash IP         |
+| cast_at     | TIMESTAMPTZ | data oddania głosu         |
+
+---
+
+### vote_answers
+
+Powiązania pomiędzy głosem a wybranymi odpowiedziami.
+
+| Kolumna     | Typ  | Opis          |
+| ----------- | ---- | ------------- |
+| id          | UUID | identyfikator |
+| vote_id     | UUID | oddany głos   |
+| question_id | UUID | pytanie       |
+| option_id   | UUID | wybrana opcja |
+
+---
+
+### result_counts
+
+Zagregowane wyniki ankiety.
+
+Tabela aktualizowana jest asynchronicznie przez worker.
+
+| Kolumna    | Typ         | Opis                  |
+| ---------- | ----------- | --------------------- |
+| option_id  | UUID        | opcja odpowiedzi      |
+| vote_count | INTEGER     | liczba głosów         |
+| updated_at | TIMESTAMPTZ | ostatnia aktualizacja |
+
+## Indeksy
+
+Projekt wykorzystuje indeksy optymalizujące:
+
+* wyszukiwanie ankiet
+* pobieranie pytań
+* pobieranie odpowiedzi
+* sprawdzanie duplikatów głosów
+
+Najważniejsze indeksy:
+
+```text
+idx_polls_public_id
+idx_polls_admin_id
+idx_votes_poll_id
+idx_votes_fingerprint
+```
+
+## Relacje
+
+```text
+polls
+ └── questions
+      └── options
+
+polls
+ └── votes
+      └── vote_answers
+
+options
+ └── result_counts
+```
+
+## API
+
+Frontend komunikuje się z backendem przez Next.js API routes, które pełnią rolę BFF (Backend For Frontend).
+
+System składa się z 4 głównych warstw API:
+
+- frontend → Next.js API routes (`/app/api/*`)
+- poll-service → zarządzanie ankietami
+- vote-service → obsługa głosów + Redis + worker queue
+- results-service → odczyt wyników
+
+### Endpointy aplikacji
+
+| Method | Endpoint                    | Opis                           |
+| ------ | --------------------------- | ------------------------------ |
+| POST   | `/api/polls`                | tworzenie nowej ankiety        |
+| GET    | `/api/polls/:publicId`      | pobranie publicznej ankiety    |
+| POST   | `/api/votes`                | oddanie głosu                  |
+| GET    | `/api/results/:publicId`    | pobranie wyników ankiety       |
+| GET    | `/api/admin/:adminId`       | pobranie panelu administratora |
+| PATCH  | `/api/admin/:adminId`       | zmiana ustawień ankiety        |
+| DELETE | `/api/admin/:adminId`       | usunięcie ankiety              |
+| POST   | `/api/admin/:adminId/reset` | reset wszystkich głosów        |
+| GET    | `/api/health`               | healthcheck aplikacji          |
+
+### Healthcheck
+
+Każda usługa udostępnia endpoint:
+
+```text
+/health
+```
+
+Przykładowa odpowiedź:
+
+```json
+{
+  "status":"ok",
+  "service": "poll-service",
+  "uptime":6728.730471533
+}
+```
+
 ---
 
 # Docker Compose
