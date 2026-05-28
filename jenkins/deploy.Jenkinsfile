@@ -15,13 +15,28 @@ try {
     def tags = json.tags ?: []
 
     def buildNo = { tag ->
-        def matcher = tag =~ /^b(\\\\d+)-/
-        return matcher.find() ? matcher.group(1).toInteger() : -1
+        try {
+            if (!tag.startsWith('b') || !tag.contains('-')) {
+                return -1
+            }
+
+            return tag.substring(1).split('-')[0].toInteger()
+        } catch (Exception ignored) {
+            return -1
+        }
     }
 
     tags = tags
         .findAll { it != 'latest' }
-        .sort { a, b -> buildNo(b) <=> buildNo(a) }
+        .sort { a, b ->
+            def byBuild = buildNo(b) <=> buildNo(a)
+
+            if (byBuild != 0) {
+                return byBuild
+            }
+
+            return b <=> a
+        }
 
     return tags ?: ['NO_TAGS_FOUND']
 } catch (Exception e) {
