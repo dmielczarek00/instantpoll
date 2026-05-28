@@ -1,23 +1,18 @@
 pipeline {
     agent any
 
-    parameters {
-        choice(
-            name: 'MODULE',
-            choices: ['frontend', 'poll-service', 'vote-service', 'results-service', 'worker'],
-            description: 'Który moduł zbudować'
-        )
-    }
-
     environment {
         REGISTRY = '192.168.1.107:5000'
         PROJECT = 'instantpoll'
     }
 
     stages {
-        stage('Resolve module') {
+        stage('Resolve module from job name') {
             steps {
                 script {
+                    def jobParts = env.JOB_NAME.tokenize('/')
+                    env.MODULE_NAME = jobParts[-1]
+
                     def modulePaths = [
                         'frontend': 'src/frontend',
                         'poll-service': 'src/poll-service',
@@ -26,11 +21,10 @@ pipeline {
                         'worker': 'src/worker'
                     ]
 
-                    env.MODULE_NAME = params.MODULE
-                    env.MODULE_PATH = modulePaths[params.MODULE]
+                    env.MODULE_PATH = modulePaths[env.MODULE_NAME]
 
                     if (!env.MODULE_PATH) {
-                        error("Unknown module: ${params.MODULE}")
+                        error("Cannot resolve module from job name: ${env.JOB_NAME}")
                     }
                 }
             }
@@ -54,12 +48,14 @@ pipeline {
         stage('Check module files') {
             steps {
                 sh '''
+                    echo "Job: ${JOB_NAME}"
                     echo "Module: ${MODULE_NAME}"
                     echo "Path: ${MODULE_PATH}"
                     echo "Image: ${IMAGE_NAME}"
 
                     test -d "${MODULE_PATH}"
                     test -f "${MODULE_PATH}/Dockerfile"
+                    test -f "${MODULE_PATH}/package.json"
                 '''
             }
         }

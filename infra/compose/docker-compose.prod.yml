@@ -1,0 +1,100 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: instantpoll-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: instantpoll
+      POSTGRES_USER: instantpoll
+      POSTGRES_PASSWORD: instantpoll_dev_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - instantpoll
+
+  redis:
+    image: redis:7-alpine
+    container_name: instantpoll-redis
+    restart: unless-stopped
+    networks:
+      - instantpoll
+
+  frontend:
+    image: 192.168.1.107:5000/instantpoll/frontend:${FRONTEND_TAG}
+    container_name: instantpoll-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      POLL_SERVICE_URL: http://poll-service:3001
+      VOTE_SERVICE_URL: http://vote-service:3002
+      RESULTS_SERVICE_URL: http://results-service:3003
+    depends_on:
+      - poll-service
+      - vote-service
+      - results-service
+    networks:
+      - instantpoll
+
+  poll-service:
+    image: 192.168.1.107:5000/instantpoll/poll-service:${POLL_SERVICE_TAG}
+    container_name: instantpoll-poll-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://instantpoll:instantpoll_dev_password@postgres:5432/instantpoll
+    depends_on:
+      - postgres
+    networks:
+      - instantpoll
+
+  vote-service:
+    image: 192.168.1.107:5000/instantpoll/vote-service:${VOTE_SERVICE_TAG}
+    container_name: instantpoll-vote-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      DATABASE_URL: postgresql://instantpoll:instantpoll_dev_password@postgres:5432/instantpoll
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - instantpoll
+
+  results-service:
+    image: 192.168.1.107:5000/instantpoll/results-service:${RESULTS_SERVICE_TAG}
+    container_name: instantpoll-results-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+      DATABASE_URL: postgresql://instantpoll:instantpoll_dev_password@postgres:5432/instantpoll
+    depends_on:
+      - postgres
+    networks:
+      - instantpoll
+
+  worker:
+    image: 192.168.1.107:5000/instantpoll/worker:${WORKER_TAG}
+    container_name: instantpoll-worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://instantpoll:instantpoll_dev_password@postgres:5432/instantpoll
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - instantpoll
+
+volumes:
+  postgres_data:
+
+networks:
+  instantpoll:
