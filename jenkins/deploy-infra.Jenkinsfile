@@ -1,100 +1,80 @@
-services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: instantpoll-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - instantpoll
+pipeline {
+    agent any
 
-  redis:
-    image: redis:7-alpine
-    container_name: instantpoll-redis
-    restart: unless-stopped
-    networks:
-      - instantpoll
+    environment {
+        APP_SERVER = '192.168.1.108'
+        APP_DIR = '/opt/instantpoll'
+    }
 
-  frontend:
-    image: 192.168.1.107:5000/instantpoll/frontend:${FRONTEND_TAG}
-    container_name: instantpoll-frontend
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      NODE_ENV: production
-      PORT: 3000
-      POLL_SERVICE_URL: http://poll-service:3001
-      VOTE_SERVICE_URL: http://vote-service:3002
-      RESULTS_SERVICE_URL: http://results-service:3003
-    depends_on:
-      - poll-service
-      - vote-service
-      - results-service
-    networks:
-      - instantpoll
+    stages {
+        stage('Upload compose') {
+            steps {
+                sshagent(credentials: ['app-server-ssh']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no sysadmin@${APP_SERVER} "mkdir -p ${APP_DIR}"
+                        scp -o StrictHostKeyChecking=no infra/compose/docker-compose.prod.yml sysadmin@${APP_SERVER}:${APP_DIR}/docker-compose.yml
+                    '''
+                }
+            }
+        }
 
-  poll-service:
-    image: 192.168.1.107:5000/instantpoll/poll-service:${POLL_SERVICE_TAG}
-    container_name: instantpoll-poll-service
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      PORT: 3001
-      DATABASE_URL: ${DATABASE_URL}
-    depends_on:
-      - postgres
-    networks:
-      - instantpoll
+        stage('Create env file') {
+            steps {
+                withCredentials([
+                    string(credentialsId: 'instantpoll-postgres-password', variable: 'POSTGRES_PASSWORD_SECRET')
+                ]) {
+                    sshagent(credentials: ['app-server-ssh']) {
+                        sh '''
+                            ssh -o StrictHostKeyChecking=no sysadmin@${APP_SERVER} "
+                                set -e
+                                cd ${APP_DIR}
 
-  vote-service:
-    image: 192.168.1.107:5000/instantpoll/vote-service:${VOTE_SERVICE_TAG}
-    container_name: instantpoll-vote-service
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      PORT: 3002
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-    depends_on:
-      - postgres
-      - redis
-    networks:
-      - instantpoll
+                                touch .env
 
-  results-service:
-    image: 192.168.1.107:5000/instantpoll/results-service:${RESULTS_SERVICE_TAG}
-    container_name: instantpoll-results-service
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      PORT: 3003
-      DATABASE_URL: ${DATABASE_URL}
-    depends_on:
-      - postgres
-    networks:
-      - instantpoll
+                                set_env() {
+                                    KEY=\\$1
+                                    VALUE=\\$2
 
-  worker:
-    image: 192.168.1.107:5000/instantpoll/worker:${WORKER_TAG}
-    container_name: instantpoll-worker
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-    depends_on:
-      - postgres
-      - redis
-    networks:
-      - instantpoll
+                                    if grep -q \"^\\${KEY}=\" .env; then
+                                        sed -i \"s|^\\${KEY}=.*|\\${KEY}=\\${VALUE}|\" .env
+                                    else
+                                        echo \"\\${KEY}=\\${VALUE}\" >> .env
+                                    fi
+                                }
 
-volumes:
-  postgres_data:
+                                set_env POSTGRES_DB instantpoll
+                                set_env POSTGRES_USER instantpoll
+                                set_env POSTGRES_PASSWORD '${POSTGRES_PASSWORD_SECRET}'
+                                set_env DATABASE_URL 'postgresql://instantpoll:${POSTGRES_PASSWORD_SECRET}@postgres:5432/instantpoll'
+                                set_env REDIS_URL 'redis://redis:6379'
 
-networks:
-  instantpoll:
+                                grep -q '^FRONTEND_TAG=' .env || echo 'FRONTEND_TAG=latest' >> .env
+                                grep -q '^POLL_SERVICE_TAG=' .env || echo 'POLL_SERVICE_TAG=latest' >> .env
+                                grep -q '^VOTE_SERVICE_TAG=' .env || echo 'VOTE_SERVICE_TAG=latest' >> .env
+                                grep -q '^RESULTS_SERVICE_TAG=' .env || echo 'RESULTS_SERVICE_TAG=latest' >> .env
+                                grep -q '^WORKER_TAG=' .env || echo 'WORKER_TAG=latest' >> .env
+
+                                chmod 600 .env
+                            "
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Start infra') {
+            steps {
+                sshagent(credentials: ['app-server-ssh']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no sysadmin@${APP_SERVER} "
+                            set -e
+                            cd ${APP_DIR}
+                            docker compose up -d postgres redis
+                            docker compose ps
+                        "
+                    '''
+                }
+            }
+        }
+    }
+}
