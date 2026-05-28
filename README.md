@@ -253,26 +253,48 @@ Build/worker
 Pipeline wykonuje:
 
 1. checkout kodu z GitHub
-2. instalację zależności
-3. build aplikacji
-4. budowę obrazu Docker
-5. smoke test obrazu
-6. skan bezpieczeństwa Trivy
-7. push obrazu do registry
-8. cleanup lokalnych obrazów i tymczasowych kontenerów
+2. wygenerowanie tagu obrazu na podstawie numeru buildu i skrótu commita
+3. instalację zależności
+4. skan katalogu modułu przez Trivy filesystem scan
+5. budowę obrazu Docker
+6. smoke test obrazu
+7. skan bezpieczeństwa Trivy
+8. push obrazu do registry
+9. cleanup lokalnych obrazów i tymczasowych kontenerów
 ---
 
 # Trivy Security Scan
 
-Przed pushowaniem obrazów wykonywany jest skan bezpieczeństwa Trivy.
+Pipeline wykorzystuje Trivy w dwóch etapach.
 
-Pipeline blokuje deployment przy wykryciu podatności HIGH lub CRITICAL.
+Pierwszy skan wykonywany jest przed budową obrazu Docker i sprawdza katalog źródłowy danego modułu:
 
-Przykład:
-
-```text
-trivy image --severity HIGH,CRITICAL
 ```
+trivy fs \
+  --scanners vuln,misconfig,secret \
+  --severity HIGH,CRITICAL \
+  --ignore-unfixed \
+  --exit-code 1 \
+  --no-progress \
+  src/frontend
+```
+
+Ten etap pozwala wykryć problemy już na poziomie kodu, zależności, konfiguracji oraz potencjalnych sekretów przed rozpoczęciem budowania obrazu.
+
+Drugi skan wykonywany jest po zbudowaniu obrazu Docker:
+
+```
+trivy image \
+  --severity HIGH,CRITICAL \
+  --ignore-unfixed \
+  --exit-code 1 \
+  --no-progress \
+  192.168.1.107:5000/instantpoll/frontend:b14-a1b2c3d
+```
+
+Ten etap sprawdza finalny obraz, czyli aplikację razem z obrazem bazowym i zależnościami znajdującymi się już w kontenerze.
+
+Oba skany blokują pipeline przy wykryciu podatności HIGH lub CRITICAL.
 
 ---
 
