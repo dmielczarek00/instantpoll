@@ -1,3 +1,178 @@
+def registryUrl = 'http://192.168.1.107:5000'
+def projectName = 'instantpoll'
+
+def tagScriptForModule = { moduleName ->
+    return """
+import groovy.json.JsonSlurper
+
+def module = '${moduleName}'
+def url = '${registryUrl}/v2/${projectName}/' + module + '/tags/list'
+
+try {
+    def response = new URL(url).text
+    def json = new JsonSlurper().parseText(response)
+
+    def tags = json.tags ?: []
+
+    def buildNo = { tag ->
+        def matcher = tag =~ /^b(\\\\d+)-/
+        return matcher.find() ? matcher.group(1).toInteger() : -1
+    }
+
+    tags = tags
+        .findAll { it != 'latest' }
+        .sort { a, b -> buildNo(b) <=> buildNo(a) }
+
+    return tags ?: ['NO_TAGS_FOUND']
+} catch (Exception e) {
+    return ['ERROR: ' + e.message]
+}
+"""
+}
+
+def fallbackScript = """
+return ['NO_TAGS_FOUND']
+"""
+
+properties([
+    parameters([
+        booleanParam(
+            name: 'DEPLOY_FRONTEND',
+            defaultValue: false,
+            description: 'Wdrożyć frontend?'
+        ),
+        [
+            $class: 'ChoiceParameter',
+            name: 'FRONTEND_TAG',
+            description: 'Tag obrazu frontend',
+            choiceType: 'PT_SINGLE_SELECT',
+            filterable: false,
+            filterLength: 1,
+            script: [
+                $class: 'GroovyScript',
+                script: [
+                    sandbox: true,
+                    classpath: [],
+                    script: tagScriptForModule('frontend')
+                ],
+                fallbackScript: [
+                    sandbox: true,
+                    classpath: [],
+                    script: fallbackScript
+                ]
+            ]
+        ],
+
+        booleanParam(
+            name: 'DEPLOY_POLL_SERVICE',
+            defaultValue: false,
+            description: 'Wdrożyć poll-service?'
+        ),
+        [
+            $class: 'ChoiceParameter',
+            name: 'POLL_SERVICE_TAG',
+            description: 'Tag obrazu poll-service',
+            choiceType: 'PT_SINGLE_SELECT',
+            filterable: false,
+            filterLength: 1,
+            script: [
+                $class: 'GroovyScript',
+                script: [
+                    sandbox: true,
+                    classpath: [],
+                    script: tagScriptForModule('poll-service')
+                ],
+                fallbackScript: [
+                    sandbox: true,
+                    classpath: [],
+                    script: fallbackScript
+                ]
+            ]
+        ],
+
+        booleanParam(
+            name: 'DEPLOY_VOTE_SERVICE',
+            defaultValue: false,
+            description: 'Wdrożyć vote-service?'
+        ),
+        [
+            $class: 'ChoiceParameter',
+            name: 'VOTE_SERVICE_TAG',
+            description: 'Tag obrazu vote-service',
+            choiceType: 'PT_SINGLE_SELECT',
+            filterable: false,
+            filterLength: 1,
+            script: [
+                $class: 'GroovyScript',
+                script: [
+                    sandbox: true,
+                    classpath: [],
+                    script: tagScriptForModule('vote-service')
+                ],
+                fallbackScript: [
+                    sandbox: true,
+                    classpath: [],
+                    script: fallbackScript
+                ]
+            ]
+        ],
+
+        booleanParam(
+            name: 'DEPLOY_RESULTS_SERVICE',
+            defaultValue: false,
+            description: 'Wdrożyć results-service?'
+        ),
+        [
+            $class: 'ChoiceParameter',
+            name: 'RESULTS_SERVICE_TAG',
+            description: 'Tag obrazu results-service',
+            choiceType: 'PT_SINGLE_SELECT',
+            filterable: false,
+            filterLength: 1,
+            script: [
+                $class: 'GroovyScript',
+                script: [
+                    sandbox: true,
+                    classpath: [],
+                    script: tagScriptForModule('results-service')
+                ],
+                fallbackScript: [
+                    sandbox: true,
+                    classpath: [],
+                    script: fallbackScript
+                ]
+            ]
+        ],
+
+        booleanParam(
+            name: 'DEPLOY_WORKER',
+            defaultValue: false,
+            description: 'Wdrożyć worker?'
+        ),
+        [
+            $class: 'ChoiceParameter',
+            name: 'WORKER_TAG',
+            description: 'Tag obrazu worker',
+            choiceType: 'PT_SINGLE_SELECT',
+            filterable: false,
+            filterLength: 1,
+            script: [
+                $class: 'GroovyScript',
+                script: [
+                    sandbox: true,
+                    classpath: [],
+                    script: tagScriptForModule('worker')
+                ],
+                fallbackScript: [
+                    sandbox: true,
+                    classpath: [],
+                    script: fallbackScript
+                ]
+            ]
+        ]
+    ])
+])
+
 pipeline {
     agent any
 
@@ -10,20 +185,20 @@ pipeline {
         stage('Validate parameters') {
             steps {
                 script {
-                    if (params.DEPLOY_FRONTEND && !params.FRONTEND_TAG?.trim()) {
-                        error('Zaznaczono frontend, ale FRONTEND_TAG jest pusty')
+                    if (params.DEPLOY_FRONTEND && (!params.FRONTEND_TAG?.trim() || params.FRONTEND_TAG == 'NO_TAGS_FOUND' || params.FRONTEND_TAG.startsWith('ERROR:'))) {
+                        error('Zaznaczono frontend, ale FRONTEND_TAG jest pusty albo niepoprawny')
                     }
-                    if (params.DEPLOY_POLL_SERVICE && !params.POLL_SERVICE_TAG?.trim()) {
-                        error('Zaznaczono poll-service, ale POLL_SERVICE_TAG jest pusty')
+                    if (params.DEPLOY_POLL_SERVICE && (!params.POLL_SERVICE_TAG?.trim() || params.POLL_SERVICE_TAG == 'NO_TAGS_FOUND' || params.POLL_SERVICE_TAG.startsWith('ERROR:'))) {
+                        error('Zaznaczono poll-service, ale POLL_SERVICE_TAG jest pusty albo niepoprawny')
                     }
-                    if (params.DEPLOY_VOTE_SERVICE && !params.VOTE_SERVICE_TAG?.trim()) {
-                        error('Zaznaczono vote-service, ale VOTE_SERVICE_TAG jest pusty')
+                    if (params.DEPLOY_VOTE_SERVICE && (!params.VOTE_SERVICE_TAG?.trim() || params.VOTE_SERVICE_TAG == 'NO_TAGS_FOUND' || params.VOTE_SERVICE_TAG.startsWith('ERROR:'))) {
+                        error('Zaznaczono vote-service, ale VOTE_SERVICE_TAG jest pusty albo niepoprawny')
                     }
-                    if (params.DEPLOY_RESULTS_SERVICE && !params.RESULTS_SERVICE_TAG?.trim()) {
-                        error('Zaznaczono results-service, ale RESULTS_SERVICE_TAG jest pusty')
+                    if (params.DEPLOY_RESULTS_SERVICE && (!params.RESULTS_SERVICE_TAG?.trim() || params.RESULTS_SERVICE_TAG == 'NO_TAGS_FOUND' || params.RESULTS_SERVICE_TAG.startsWith('ERROR:'))) {
+                        error('Zaznaczono results-service, ale RESULTS_SERVICE_TAG jest pusty albo niepoprawny')
                     }
-                    if (params.DEPLOY_WORKER && !params.WORKER_TAG?.trim()) {
-                        error('Zaznaczono worker, ale WORKER_TAG jest pusty')
+                    if (params.DEPLOY_WORKER && (!params.WORKER_TAG?.trim() || params.WORKER_TAG == 'NO_TAGS_FOUND' || params.WORKER_TAG.startsWith('ERROR:'))) {
+                        error('Zaznaczono worker, ale WORKER_TAG jest pusty albo niepoprawny')
                     }
 
                     if (
@@ -83,7 +258,7 @@ pipeline {
             }
         }
 
-        stage('Upload selected tag updates') {
+        stage('Upload deploy data') {
             steps {
                 sshagent(credentials: ['app-server-ssh']) {
                     sh '''
@@ -91,8 +266,14 @@ pipeline {
 ${ENV_UPDATES}
 EOF
 
+                        cat > .selected-services <<EOF
+${SELECTED_SERVICES}
+EOF
+
                         scp -o StrictHostKeyChecking=no .env.deploy-updates sysadmin@${APP_SERVER}:${APP_DIR}/.env.deploy-updates
-                        rm -f .env.deploy-updates
+                        scp -o StrictHostKeyChecking=no .selected-services sysadmin@${APP_SERVER}:${APP_DIR}/.selected-services
+
+                        rm -f .env.deploy-updates .selected-services
                     '''
                 }
             }
@@ -108,8 +289,9 @@ EOF
 
                             test -f .env
                             test -f .env.deploy-updates
+                            test -f .selected-services
 
-                            while IFS='=' read -r KEY VALUE; do
+                            while IFS="=" read -r KEY VALUE; do
                                 [ -z "$KEY" ] && continue
 
                                 if grep -q "^${KEY}=" .env; then
@@ -119,7 +301,9 @@ EOF
                                 fi
                             done < .env.deploy-updates
 
-                            rm -f .env.deploy-updates
+                            SELECTED_SERVICES="$(cat .selected-services)"
+
+                            rm -f .env.deploy-updates .selected-services
 
                             echo "Selected services: ${SELECTED_SERVICES}"
 
