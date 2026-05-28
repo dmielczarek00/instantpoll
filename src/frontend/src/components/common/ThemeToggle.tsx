@@ -2,10 +2,20 @@
 
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return <div className="w-9 h-9" />; // placeholder SSR → brak mismatch
+  }
 
   const isDark = theme === "dark";
 
@@ -18,17 +28,13 @@ export function ThemeToggle() {
     >
       <Sun
         className={`h-[1.2rem] w-[1.2rem] transition-all duration-500 ${
-          isDark
-            ? "rotate-90 scale-0"
-            : "rotate-0 scale-100"
+          isDark ? "rotate-90 scale-0" : "rotate-0 scale-100"
         }`}
       />
 
       <Moon
         className={`absolute h-[1.2rem] w-[1.2rem] transition-all duration-500 ${
-          isDark
-            ? "rotate-0 scale-100"
-            : "-rotate-90 scale-0"
+          isDark ? "rotate-0 scale-100" : "-rotate-90 scale-0"
         }`}
       />
 
