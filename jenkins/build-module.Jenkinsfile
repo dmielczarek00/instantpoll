@@ -107,40 +107,83 @@ pipeline {
             }
         }
 
-        stage('Debug built image') {
+        stage('Smoke test image') {
+            when {
+                expression {
+                    return env.MODULE_NAME in ['poll-service', 'vote-service', 'results-service']
+                }
+            }
             steps {
                 sh '''
-                    echo "Image inspect:"
-                    docker image inspect "${IMAGE_NAME}" --format='ID={{.Id}} CREATED={{.Created}}'
+                    CONTAINER_NAME="smoke-${MODULE_NAME}-${BUILD_NUMBER}"
+                    TEST_NETWORK="smoke-net-${BUILD_NUMBER}"
 
-                    echo ""
-                    echo "Check package files and picomatch inside image:"
-                    docker run --rm "${IMAGE_NAME}" sh -c '
-                        echo ""
-                        echo "Package files:"
-                        find /app -maxdepth 2 -name "package*.json" -print || true
+                    docker network create "${TEST_NETWORK}"
 
-                        echo ""
-                        echo "picomatch in /app package files:"
-                        grep -R "\\"picomatch\\"" -n /app/package*.json 2>/dev/null || true
+                    docker run -d \
+                    --name "${CONTAINER_NAME}" \
+                    --network "${TEST_NETWORK}" \
+                    -e PORT=3000 \
+                    -e DATABASE_URL="postgresql://dummy:dummy@dummy:5432/dummy" \
+                    -e REDIS_URL="redis://dummy:6379" \
+                    "${IMAGE_NAME}"
 
-                        echo ""
-                        echo "4.0.3 in /app package files:"
-                        grep -R "\\"4.0.3\\"" -n /app/package*.json 2>/dev/null || true
+                    sleep 5
 
-                        echo ""
-                        echo "4.0.4 in /app package files:"
-                        grep -R "\\"4.0.4\\"" -n /app/package*.json 2>/dev/null || true
+                    docker run --rm \
+                    --network "${TEST_NETWORK}" \
+                    curlimages/curl:8.10.1 \
+                    --fail --silent --show-error \
+                    "http://${CONTAINER_NAME}:3000/health"
 
-                        echo ""
-                        echo "picomatch files in node_modules:"
-                        find /app/node_modules -path "*picomatch*" 2>/dev/null || true
-
-                        echo ""
-                        echo "npm ls picomatch:"
-                        npm ls picomatch || true
-                    '
+                    docker rm -f "${CONTAINER_NAME}"
+                    docker network rm "${TEST_NETWORK}"
                 '''
+            }
+            post {
+                always {
+                    sh '''
+                        docker rm -f "smoke-${MODULE_NAME}-${BUILD_NUMBER}" 2>/dev/null || true
+                        docker network rm "smoke-net-${BUILD_NUMBER}" 2>/dev/null || true
+                    '''
+                }
+            }
+        }
+
+        stage('Smoke test image') {
+            when {
+                expression {
+                    return env.MODULE_NAME == 'frontend'
+                }
+            }
+            steps {
+                sh '''
+                    CONTAINER_NAME="smoke-${MODULE_NAME}-${BUILD_NUMBER}"
+
+                    docker run -d \
+                    --name "${CONTAINER_NAME}" \
+                    -e PORT=3000 \
+                    -e HOSTNAME=0.0.0.0 \
+                    -e POLL_SERVICE_URL=http://poll-service:3001 \
+                    -e VOTE_SERVICE_URL=http://vote-service:3002 \
+                    -e RESULTS_SERVICE_URL=http://results-service:3003 \
+                    "${IMAGE_NAME}"
+
+                    sleep 8
+
+                    docker exec "${CONTAINER_NAME}" sh -c '
+                        wget -qO- http://127.0.0.1:3000/api/health
+                    '
+
+                    docker rm -f "${CONTAINER_NAME}"
+                '''
+            }
+            post {
+                always {
+                    sh '''
+                        docker rm -f "smoke-${MODULE_NAME}-${BUILD_NUMBER}" 2>/dev/null || true
+                    '''
+                }
             }
         }
 
