@@ -64,15 +64,70 @@ Dodatkowo wykorzystywane są:
 
 # Architektura infrastruktury
 
+Środowisko zostało uruchomione w homelabie na Proxmox VE. Poszczególne elementy aplikacji i infrastruktury działają na osobnych maszynach wirtualnych, co pozwala rozdzielić role systemów i lepiej odwzorować środowisko produkcyjne.
+
+W projekcie wykorzystano oddzielne VM dla Jenkinsa, serwera aplikacyjnego, reverse proxy, DNS oraz WireGuard VPN.
+
+## Platforma homelab
+
+| Element        | Opis                    |
+| -------------- | ----------------------- |
+| Hypervisor     | Proxmox VE              |
+| Typ środowiska | homelab                 |
+| Wirtualizacja  | maszyny VM              |
+| Systemy VM     | Debian/Linux            |
+| Konteneryzacja | Docker + Docker Compose |
+| Dostęp zdalny  | WireGuard VPN           |
+
 ## Maszyny wirtualne
 
-| VM | Adres IP | Rola |
-|---|---|---|
-| Jenkins | 192.168.1.107 | Jenkins + Docker Registry |
-| App-Server | 192.168.1.108 | deployment aplikacji |
-| proxy-guest | 192.168.1.105 | reverse proxy Nginx |
-| dnsmasq-guest | 192.168.1.106 | wildcard DNS |
-| WireGuard | 192.168.1.103 | dostęp VPN |
+| VM            | Adres IP      | Rola                      |
+| ------------- | ------------- | ------------------------- |
+| Jenkins       | 192.168.1.107 | Jenkins + Docker Registry |
+| App-Server    | 192.168.1.108 | deployment aplikacji      |
+| proxy-guest   | 192.168.1.105 | reverse proxy Nginx       |
+| dnsmasq-guest | 192.168.1.106 | wildcard DNS              |
+| WireGuard     | 192.168.1.103 | dostęp VPN                |
+
+## Jenkins
+
+Jenkins działa na osobnej maszynie wirtualnej i odpowiada za budowanie obrazów, skanowanie bezpieczeństwa, publikowanie obrazów do prywatnego registry oraz wdrażanie aplikacji na App-Server.
+
+Pipeline korzysta z Jenkinsfile przechowywanych w repozytorium, dzięki czemu logika CI/CD jest wersjonowana razem z kodem aplikacji.
+
+## Jenkins plugins
+
+W Jenkinsie wykorzystywane są pluginy potrzebne do pracy z GitHubem, pipeline'ami, SSH, credentials oraz dynamicznymi parametrami deploymentu.
+
+| Plugin              | Zastosowanie                                     |
+| ------------------- | ------------------------------------------------ |
+| Pipeline            | obsługa Jenkinsfile i pipeline stages            |
+| Git                 | checkout kodu z GitHub                           |
+| Credentials         | przechowywanie sekretów i kluczy                 |
+| Credentials Binding | wstrzykiwanie sekretów do pipeline               |
+| SSH Agent           | deployment przez SSH na App-Server               |
+| Folders             | organizacja jobów w katalogi Build i Deploy      |
+| Active Choices      | dynamiczne dropdowny z tagami obrazów z registry |
+
+## Organizacja jobów Jenkins
+
+Joby zostały podzielone logicznie na build i deployment.
+
+```text
+Build/
+├── frontend
+├── poll-service
+├── vote-service
+├── results-service
+└── worker
+
+Deployment/
+├── infra
+├── db-migrate
+└── instantpoll
+```
+
+Taki podział pozwala budować i wdrażać każdy moduł niezależnie, bez wymuszania pełnego redeploymentu całej aplikacji.
 
 ---
 
@@ -201,9 +256,10 @@ Pipeline wykonuje:
 2. instalację zależności
 3. build aplikacji
 4. budowę obrazu Docker
-5. skan bezpieczeństwa Trivy
-6. push obrazu do registry
-
+5. smoke test obrazu
+6. skan bezpieczeństwa Trivy
+7. push obrazu do registry
+8. cleanup lokalnych obrazów i tymczasowych kontenerów
 ---
 
 # Trivy Security Scan
