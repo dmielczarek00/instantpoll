@@ -217,4 +217,26 @@ pipeline {
             }
         }
     }
+    
+    post {
+        always {
+            sh '''
+                echo "Cleaning local Docker images and dangling layers..."
+
+                docker rm -f "smoke-${MODULE_NAME}-${BUILD_NUMBER}" 2>/dev/null || true
+                docker network rm "smoke-net-${MODULE_NAME}-${BUILD_NUMBER}" 2>/dev/null || true
+                docker network rm "smoke-net-${BUILD_NUMBER}" 2>/dev/null || true
+
+                if [ -n "${IMAGE_NAME}" ]; then
+                    docker rmi "${IMAGE_NAME}" 2>/dev/null || true
+                fi
+
+                if [ -n "${LATEST_IMAGE_NAME}" ]; then
+                    docker rmi "${LATEST_IMAGE_NAME}" 2>/dev/null || true
+                fi
+
+                docker image prune -f
+            '''
+        }
+    }
 }
