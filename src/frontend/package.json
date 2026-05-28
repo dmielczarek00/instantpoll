@@ -40,6 +40,9 @@
   },
   "overrides": {
     "picomatch": "^4.0.4",
-    "postcss": "^8.5.10"
+    "postcss": "^8.5.10",
+    "micromatch": {
+      "picomatch": "^2.3.2"
+    }
   }
 }
