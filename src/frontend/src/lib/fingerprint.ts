@@ -45,3 +45,7 @@ export function markVoted(publicId: string): void {
   } catch {
   }
 }
+
+export function clearVoted(publicId: string) {
+  localStorage.removeItem(`voted_${publicId}`);
+}

@@ -22,7 +22,9 @@ export async function GET(
   const poll = await pollRes.json();
   const results = await resultsRes.json();
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const host = _req.headers.get("x-forwarded-host") ?? _req.headers.get("host") ?? "localhost:3000";
+  const proto = _req.headers.get("x-forwarded-proto") ?? "http";
+  const appUrl = `${proto}://${host}`;
 
   return NextResponse.json({
     poll,

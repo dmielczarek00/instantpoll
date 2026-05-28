@@ -87,5 +87,55 @@ app.post("/votes", async (req, res) => {
   }
 });
 
+// POST votes/admin/:adminId/reset
+
+app.post("/votes/admin/:adminId/reset", async (req, res) => {
+  const { adminId } = req.params;
+
+  const { rows: [poll] } = await db.query(
+    `SELECT id FROM polls WHERE admin_id = $1`,
+    [adminId]
+  );
+
+  if (!poll) {
+    return res.status(404).json({
+      message: "Ankieta nie istnieje",
+    });
+  }
+
+  try {
+    // usuń głosy
+    await db.query(
+      `DELETE FROM votes WHERE poll_id = $1`,
+      [poll.id]
+    );
+
+    // wyzeruj wyniki
+    await db.query(`
+      UPDATE result_counts rc
+      SET vote_count = 0
+      FROM options o
+      JOIN questions q ON q.id = o.question_id
+      WHERE rc.option_id = o.id
+        AND q.poll_id = $1
+    `, [poll.id]);
+
+    // usuń blokady redis
+    const keys = await redis.keys(`voted:${poll.id}:*`);
+
+    if (keys.length > 0) {
+      await redis.del(keys);
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[RESET VOTES]", err);
+
+    res.status(500).json({
+      message: "Błąd resetowania głosów",
+    });
+  }
+});
+
 const PORT = process.env.PORT ?? 3002;
 app.listen(PORT, () => console.log(`[vote-service] running on :${PORT}`));
