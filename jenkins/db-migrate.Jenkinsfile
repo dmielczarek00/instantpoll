@@ -29,11 +29,12 @@ pipeline {
                             docker run --rm \
                             --network instantpoll_instantpoll \
                             -v /opt/instantpoll/db:/liquibase/changelog \
-                            liquibase/liquibase:latest-alpine \
+                            liquibase/liquibase:4.26.0-alpine \
                             --url=jdbc:postgresql://postgres:5432/instantpoll \
                             --username=instantpoll \
                             --password="$(grep "^POSTGRES_PASSWORD=" .env | cut -d= -f2-)" \
-                            --changeLogFile=/liquibase/changelog/changelog.sql \
+                            --searchPath=/liquibase/changelog \
+                            --changeLogFile=changelog.sql
                             update
                         '
                     '''
