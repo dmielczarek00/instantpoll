@@ -64,23 +64,23 @@ pipeline {
 
                     if (params.DEPLOY_FRONTEND) {
                         services << 'frontend'
-                        envUpdates << "set_env FRONTEND_TAG ${params.FRONTEND_TAG}"
+                        envUpdates << "FRONTEND_TAG=${params.FRONTEND_TAG}"
                     }
                     if (params.DEPLOY_POLL_SERVICE) {
                         services << 'poll-service'
-                        envUpdates << "set_env POLL_SERVICE_TAG ${params.POLL_SERVICE_TAG}"
+                        envUpdates << "POLL_SERVICE_TAG=${params.POLL_SERVICE_TAG}"
                     }
                     if (params.DEPLOY_VOTE_SERVICE) {
                         services << 'vote-service'
-                        envUpdates << "set_env VOTE_SERVICE_TAG ${params.VOTE_SERVICE_TAG}"
+                        envUpdates << "VOTE_SERVICE_TAG=${params.VOTE_SERVICE_TAG}"
                     }
                     if (params.DEPLOY_RESULTS_SERVICE) {
                         services << 'results-service'
-                        envUpdates << "set_env RESULTS_SERVICE_TAG ${params.RESULTS_SERVICE_TAG}"
+                        envUpdates << "RESULTS_SERVICE_TAG=${params.RESULTS_SERVICE_TAG}"
                     }
                     if (params.DEPLOY_WORKER) {
                         services << 'worker'
-                        envUpdates << "set_env WORKER_TAG ${params.WORKER_TAG}"
+                        envUpdates << "WORKER_TAG=${params.WORKER_TAG}"
                     }
 
                     env.SELECTED_SERVICES = services.join(' ')
@@ -100,6 +100,21 @@ pipeline {
             }
         }
 
+        stage('Upload selected tag updates') {
+            steps {
+                sshagent(credentials: ['app-server-ssh']) {
+                    sh '''
+                        cat > .env.deploy-updates <<EOF
+${ENV_UPDATES}
+EOF
+
+                        scp -o StrictHostKeyChecking=no .env.deploy-updates sysadmin@${APP_SERVER}:${APP_DIR}/.env.deploy-updates
+                        rm -f .env.deploy-updates
+                    '''
+                }
+            }
+        }
+
         stage('Update versions and deploy selected modules') {
             steps {
                 sshagent(credentials: ['app-server-ssh']) {
@@ -108,26 +123,19 @@ pipeline {
                             set -e
                             cd ${APP_DIR}
 
-                            touch .env
+                            test -f .env
 
-                            set_env() {
-                                KEY=\\$1
-                                VALUE=\\$2
+                            while IFS='=' read -r KEY VALUE; do
+                                [ -z \\"\\$KEY\\" ] && continue
 
-                                if grep -q \"^\\${KEY}=\" .env; then
-                                    sed -i \"s/^\\${KEY}=.*/\\${KEY}=\\${VALUE}/\" .env
+                                if grep -q \\"^\\${KEY}=\\" .env; then
+                                    sed -i \\"s|^\\${KEY}=.*|\\${KEY}=\\${VALUE}|\\" .env
                                 else
-                                    echo \"\\${KEY}=\\${VALUE}\" >> .env
+                                    echo \\"\\${KEY}=\\${VALUE}\\" >> .env
                                 fi
-                            }
+                            done < .env.deploy-updates
 
-                            grep -q '^FRONTEND_TAG=' .env || echo 'FRONTEND_TAG=latest' >> .env
-                            grep -q '^POLL_SERVICE_TAG=' .env || echo 'POLL_SERVICE_TAG=latest' >> .env
-                            grep -q '^VOTE_SERVICE_TAG=' .env || echo 'VOTE_SERVICE_TAG=latest' >> .env
-                            grep -q '^RESULTS_SERVICE_TAG=' .env || echo 'RESULTS_SERVICE_TAG=latest' >> .env
-                            grep -q '^WORKER_TAG=' .env || echo 'WORKER_TAG=latest' >> .env
-
-                            ${ENV_UPDATES}
+                            rm -f .env.deploy-updates
 
                             echo 'Selected services: ${SELECTED_SERVICES}'
 
