@@ -1,0 +1,11 @@
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    server_name .guest.lab.lan;
+
+    location / {
+        default_type text/plain;
+        return 200 "guest wildcard proxy works\nhost: $host\n";
+    }
+}
