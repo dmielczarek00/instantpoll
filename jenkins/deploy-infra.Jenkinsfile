@@ -31,12 +31,6 @@ POSTGRES_USER=instantpoll
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD_SECRET}
 DATABASE_URL=postgresql://instantpoll:${POSTGRES_PASSWORD_SECRET}@postgres:5432/instantpoll
 REDIS_URL=redis://redis:6379
-
-FRONTEND_TAG=latest
-POLL_SERVICE_TAG=latest
-VOTE_SERVICE_TAG=latest
-RESULTS_SERVICE_TAG=latest
-WORKER_TAG=latest
 EOF
 
                             scp -o StrictHostKeyChecking=no .env.instantpoll sysadmin@${APP_SERVER}:${APP_DIR}/.env
