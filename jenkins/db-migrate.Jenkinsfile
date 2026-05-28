@@ -34,7 +34,7 @@ pipeline {
                             --username=instantpoll \
                             --password="$(grep "^POSTGRES_PASSWORD=" .env | cut -d= -f2-)" \
                             --searchPath=/liquibase/changelog \
-                            --changeLogFile=changelog.sql
+                            --changeLogFile=changelog.sql \
                             update
                         '
                     '''
