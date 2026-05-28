@@ -27,4 +27,8 @@ RUN npm ci --omit=dev
 
 COPY --from=build /app/dist ./dist
 
+RUN chown -R node:node /app
+
+USER node
+
 CMD ["npm", "run", "start"]
