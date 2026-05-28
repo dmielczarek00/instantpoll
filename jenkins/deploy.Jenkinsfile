@@ -16,18 +16,26 @@ try {
 
     def buildNo = { tag ->
         try {
+            if (tag == null) {
+                return -1
+            }
+
+            tag = tag.toString().trim()
+
             if (!tag.startsWith('b') || !tag.contains('-')) {
                 return -1
             }
 
-            return tag.substring(1).split('-')[0].toInteger()
+            def numberPart = tag.substring(1, tag.indexOf('-'))
+            return numberPart.toInteger()
         } catch (Exception ignored) {
             return -1
         }
     }
 
     tags = tags
-        .findAll { it != 'latest' }
+        .collect { it.toString().trim() }
+        .findAll { it && it != 'latest' && buildNo(it) >= 0 }
         .sort { a, b ->
             def byBuild = buildNo(b) <=> buildNo(a)
 
@@ -38,7 +46,15 @@ try {
             return b <=> a
         }
 
-    return tags ?: ['NO_TAGS_FOUND']
+    if (!tags) {
+        return ['NO_TAGS_FOUND']
+    }
+
+    def newest = tags[0]
+
+    return tags.collect { tag ->
+        tag == newest ? "\${tag}:selected" : tag
+    }
 } catch (Exception e) {
     return ['ERROR: ' + e.message]
 }
