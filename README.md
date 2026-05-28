@@ -22,6 +22,7 @@ Autorzy:
 - agregacja wyników
 - architektura mikroserwisowa
 - pipeline CI/CD
+- automatyczne healthchecki po buildzie
 - wersjonowanie obrazów Docker
 - selektywne wdrażanie usług
 - migracje bazy danych Liquibase
@@ -435,10 +436,13 @@ Certyfikaty przechowywane są na proxy-guest.
 1. push kodu na GitHub
 2. uruchomienie build pipeline
 3. build obrazu Docker
-4. Trivy scan
-5. push do registry
-6. wybór wersji w Deploy/instantpoll
-7. deployment wybranych usług
+4. smoke test obrazu
+5. Trivy scan
+6. push do registry
+7. cleanup lokalnych obrazów Docker
+8. wybór wersji w Deploy/instantpoll
+9. deployment wybranych usług
+10. healthcheck po wdrożeniu
 
 ---
 
@@ -482,3 +486,5 @@ Aktualnie zaimplementowane:
 - wildcard DNS
 - selektywne deploymenty
 - wersjonowanie obrazów
+- smoke testy kontenerów
+- automatyczne healthchecki deploymentów
