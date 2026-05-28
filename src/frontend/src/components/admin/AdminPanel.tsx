@@ -7,8 +7,9 @@ import { ResultsChart } from "./ResultsChart";
 import { LinksPanel } from "./LinksPanel";
 import { PollSettings } from "./PollSettings";
 import { DangerZone } from "./DangerZone";
-import { updatePollSettings, deletePoll, resetVotes } from "@/lib/api";
+import { updatePollSettings, deletePoll, resetVotes, fetchAdminData } from "@/lib/api";
 import type { AdminPollData } from "@/types/api";
+import { clearVoted } from "@/lib/fingerprint";
 
 interface AdminPanelProps {
   initialData: AdminPollData;
@@ -49,10 +50,15 @@ const handleToggle = async (field: "isActive" | "resultsVisible") => {
 };
 
   const handleResetVotes = async () => {
-    await resetVotes(adminId);
-    // Odśwież dane
-    const updated = await updatePollSettings(adminId, {});
-    setData({ ...updated, results: { ...updated.results, totalVotes: 0 } });
+    try {
+      await resetVotes(adminId);
+      clearVoted(data.poll.publicId);
+
+      const updated = await fetchAdminData(adminId);
+      setData(updated);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleDeletePoll = async () => {

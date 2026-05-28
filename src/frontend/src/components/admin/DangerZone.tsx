@@ -57,7 +57,6 @@ export function DangerZone({ onResetVotes, onDeletePoll }: DangerZoneProps) {
         </div>
 
         <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-          {/* Reset głosów */}
           <div className="flex items-center justify-between gap-4 px-5 py-4">
             <div className="space-y-0.5">
               <p className="text-sm font-medium text-zinc-900 dark:text-white">

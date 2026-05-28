@@ -14,7 +14,7 @@ export function ThemeToggle() {
   }, []);
 
   if (!mounted) {
-    return <div className="w-9 h-9" />; // placeholder SSR → brak mismatch
+    return <div className="w-9 h-9" />;
   }
 
   const isDark = theme === "dark";
