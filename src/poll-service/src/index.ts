@@ -206,5 +206,13 @@ app.delete("/polls/admin/:adminId", async (req, res) => {
   res.json({ success: true });
 });
 
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "poll-service",
+    uptime: process.uptime(),
+  });
+});
+
 const PORT = process.env.PORT ?? 3001;
 app.listen(PORT, () => console.log(`[poll-service] running on :${PORT}`));

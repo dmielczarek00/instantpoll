@@ -83,5 +83,13 @@ app.get("/results/admin/:adminId", async (req, res) => {
   return res.redirect(`/results/${poll.public_id}`);
 });
 
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "results-service",
+    uptime: process.uptime(),
+  });
+});
+
 const PORT = process.env.PORT ?? 3003;
 app.listen(PORT, () => console.log(`[results-service] running on :${PORT}`));

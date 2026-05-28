@@ -137,5 +137,13 @@ app.post("/votes/admin/:adminId/reset", async (req, res) => {
   }
 });
 
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "vote-service",
+    uptime: process.uptime(),
+  });
+});
+
 const PORT = process.env.PORT ?? 3002;
 app.listen(PORT, () => console.log(`[vote-service] running on :${PORT}`));
