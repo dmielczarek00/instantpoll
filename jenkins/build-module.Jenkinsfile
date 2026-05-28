@@ -63,7 +63,7 @@ pipeline {
         stage('Build image') {
             steps {
                 sh '''
-                    docker build \
+                    docker build --no-cache \
                       -t "${IMAGE_NAME}" \
                       -t "${LATEST_IMAGE_NAME}" \
                       "${MODULE_PATH}"
