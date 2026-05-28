@@ -52,50 +52,6 @@ pipeline {
             }
         }
 
-        stage('Check module files') {
-            steps {
-                sh '''
-                    echo "Job: ${JOB_NAME}"
-                    echo "Module: ${MODULE_NAME}"
-                    echo "Path: ${MODULE_PATH}"
-                    echo "Image: ${IMAGE_NAME}"
-                    echo "Latest image: ${LATEST_IMAGE_NAME}"
-
-                    echo ""
-                    echo "Git commit:"
-                    git rev-parse HEAD
-
-                    echo ""
-                    echo "Git branch:"
-                    git branch --show-current || true
-
-                    echo ""
-                    echo "Module files:"
-                    test -d "${MODULE_PATH}"
-                    test -f "${MODULE_PATH}/Dockerfile"
-                    test -f "${MODULE_PATH}/package.json"
-
-                    if [ -f "${MODULE_PATH}/package-lock.json" ]; then
-                        echo "package-lock.json exists"
-                    else
-                        echo "WARNING: package-lock.json does not exist"
-                    fi
-
-                    echo ""
-                    echo "picomatch in module package files:"
-                    grep -R '"picomatch"' -n "${MODULE_PATH}/package.json" "${MODULE_PATH}/package-lock.json" 2>/dev/null || true
-
-                    echo ""
-                    echo "picomatch 4.0.3 in module package files:"
-                    grep -R '"4.0.3"' -n "${MODULE_PATH}/package.json" "${MODULE_PATH}/package-lock.json" 2>/dev/null || true
-
-                    echo ""
-                    echo "picomatch 4.0.4 in module package files:"
-                    grep -R '"4.0.4"' -n "${MODULE_PATH}/package.json" "${MODULE_PATH}/package-lock.json" 2>/dev/null || true
-                '''
-            }
-        }
-
         stage('Build image') {
             steps {
                 sh '''
@@ -107,7 +63,7 @@ pipeline {
             }
         }
 
-        stage('Smoke test image') {
+        stage('Smoke test backend image') {
             when {
                 expression {
                     return env.MODULE_NAME in ['poll-service', 'vote-service', 'results-service']
@@ -116,35 +72,101 @@ pipeline {
             steps {
                 sh '''
                     CONTAINER_NAME="smoke-${MODULE_NAME}-${BUILD_NUMBER}"
-                    TEST_NETWORK="smoke-net-${BUILD_NUMBER}"
+                    POSTGRES_CONTAINER="smoke-postgres-${MODULE_NAME}-${BUILD_NUMBER}"
+                    REDIS_CONTAINER="smoke-redis-${MODULE_NAME}-${BUILD_NUMBER}"
+                    TEST_NETWORK="smoke-net-${MODULE_NAME}-${BUILD_NUMBER}"
+
+                    case "${MODULE_NAME}" in
+                    poll-service)
+                        PORT=3001
+                        ;;
+                    vote-service)
+                        PORT=3002
+                        ;;
+                    results-service)
+                        PORT=3003
+                        ;;
+                    *)
+                        echo "Unknown backend module: ${MODULE_NAME}"
+                        exit 1
+                        ;;
+                    esac
 
                     docker network create "${TEST_NETWORK}"
 
                     docker run -d \
+                    --name "${POSTGRES_CONTAINER}" \
+                    --network "${TEST_NETWORK}" \
+                    --network-alias smoke-postgres \
+                    -e POSTGRES_DB=instantpoll \
+                    -e POSTGRES_USER=instantpoll \
+                    -e POSTGRES_PASSWORD=instantpoll \
+                    postgres:16-alpine
+
+                    docker run -d \
+                    --name "${REDIS_CONTAINER}" \
+                    --network "${TEST_NETWORK}" \
+                    --network-alias smoke-redis \
+                    redis:7-alpine
+
+                    echo "Waiting for PostgreSQL..."
+                    for i in $(seq 1 30); do
+                        if docker exec "${POSTGRES_CONTAINER}" pg_isready -U instantpoll -d instantpoll >/dev/null 2>&1; then
+                            echo "PostgreSQL is ready"
+                            break
+                        fi
+
+                        if [ "$i" -eq 30 ]; then
+                            echo "PostgreSQL did not become ready"
+                            docker logs "${POSTGRES_CONTAINER}" || true
+                            exit 1
+                        fi
+
+                        sleep 1
+                    done
+
+                    docker run -d \
                     --name "${CONTAINER_NAME}" \
                     --network "${TEST_NETWORK}" \
-                    -e PORT=3000 \
-                    -e DATABASE_URL="postgresql://dummy:dummy@dummy:5432/dummy" \
-                    -e REDIS_URL="redis://dummy:6379" \
+                    --network-alias "${MODULE_NAME}" \
+                    -e PORT="${PORT}" \
+                    -e DATABASE_URL="postgresql://instantpoll:instantpoll@smoke-postgres:5432/instantpoll" \
+                    -e REDIS_URL="redis://smoke-redis:6379" \
                     "${IMAGE_NAME}"
 
-                    sleep 5
+                    echo "Waiting for ${MODULE_NAME} health..."
+                    for i in $(seq 1 30); do
+                        if docker run --rm \
+                            --network "${TEST_NETWORK}" \
+                            curlimages/curl:8.10.1 \
+                            --fail --silent --show-error \
+                            "http://${MODULE_NAME}:${PORT}/health"; then
+                            echo ""
+                            echo "${MODULE_NAME} healthcheck passed"
+                            exit 0
+                        fi
 
-                    docker run --rm \
-                    --network "${TEST_NETWORK}" \
-                    curlimages/curl:8.10.1 \
-                    --fail --silent --show-error \
-                    "http://${CONTAINER_NAME}:3000/health"
+                        if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+                            echo "${MODULE_NAME} container exited before healthcheck passed"
+                            docker logs "${CONTAINER_NAME}" || true
+                            exit 1
+                        fi
 
-                    docker rm -f "${CONTAINER_NAME}"
-                    docker network rm "${TEST_NETWORK}"
+                        sleep 1
+                    done
+
+                    echo "${MODULE_NAME} healthcheck timeout"
+                    docker logs "${CONTAINER_NAME}" || true
+                    exit 1
                 '''
             }
             post {
                 always {
                     sh '''
                         docker rm -f "smoke-${MODULE_NAME}-${BUILD_NUMBER}" 2>/dev/null || true
-                        docker network rm "smoke-net-${BUILD_NUMBER}" 2>/dev/null || true
+                        docker rm -f "smoke-postgres-${MODULE_NAME}-${BUILD_NUMBER}" 2>/dev/null || true
+                        docker rm -f "smoke-redis-${MODULE_NAME}-${BUILD_NUMBER}" 2>/dev/null || true
+                        docker network rm "smoke-net-${MODULE_NAME}-${BUILD_NUMBER}" 2>/dev/null || true
                     '''
                 }
             }
@@ -217,7 +239,7 @@ pipeline {
             }
         }
     }
-    
+
     post {
         always {
             sh '''
