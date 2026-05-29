@@ -7,7 +7,6 @@ export default function HomePage() {
       <Header />
 
       <main className="flex-1">
-        {/* Hero section — krótkie intro */}
         <section className="border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
           <div className="max-w-3xl mx-auto px-4 py-10">
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-white mb-2">

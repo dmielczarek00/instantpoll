@@ -32,7 +32,6 @@ async function run() {
   await redis.connect();
   console.log("[worker] Started, listening on vote_events queue...");
 
-  // Nieskończona pętla blokujące czytanie z kolejki (BRPOP)
   while (true) {
     try {
       // Czeka max 5s na nowe zdarzenie

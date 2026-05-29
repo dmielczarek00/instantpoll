@@ -101,8 +101,6 @@ export function PollCreator() {
     }));
   };
 
-  // ── Submit ─────────────────────────────────────────────────────────────────
-
   const handleSubmit = async () => {
     const validationErrors = validate(form);
     if (validationErrors.length > 0) {
